@@ -129,60 +129,6 @@ class OscillationAnalysis:
                                                int(smoothWindowLambda))
         return measure_map
 
-    def get_oscillations_svd(self, 
-                             n_component, 
-                             maxDelay=None,
-                             delayRange=None, 
-                             mOD=False, 
-                             vmin=None, 
-                             vmax=None, 
-                             electronvolt=False, 
-                             figsize=None ):
-        """
-        Finds fast oscillations filtering out noise using the SVD reconstruction.
-        Parameters
-        ----------
-        n_component : int
-            Number of SVD component to keep. 
-        maxDelay : int, optional
-            If provided plots the measure map only until this delay time. 
-            `delayRange` overrides this argument if provided. 
-        delayRange : tuple, optional
-            Plots the map between the delays (start_time, end_time) if provided.
-        mOD : bool, default: False
-            If True plots in mOD, if False in dT/T (percentage).
-        vmax : float, optional
-            Maximum 2D value to render. It has to be intended as a "cutoff":
-            everything above this value will be threated as `vmax`.
-        vmin : float, optional
-            Same as `vmax`.
-        electronvolt : bool, default: False
-            If True converts the photon wavelength to eV.
-        figsize : (value, value), optional
-            Size of the figure. Refere to matplotlib doc.
-        """
-        U, s, V = np.linalg.svd(self.measure_map)
-        S = np.zeros((self.measure_map.shape[0], self.measure_map.shape[1]))
-        S[:self.measure_map.shape[1], :self.measure_map.shape[1]] = np.diag(s)
-        
-        S = S[:, :n_component]
-        V = V[:n_component, :]
-        self.oscillations = U.dot(S.dot(V))
-
-        plot.plot_measure_map(self.oscillations, 
-                              self.delays, 
-                              self.lambdas,  
-                              title="Oscillations", 
-                              figsize=figsize,  
-                              delayRange=delayRange,
-                              maxDelay=maxDelay,
-                              colorbar=True,
-                              vmin=vmin, vmax=vmax,
-                              electronvolt=electronvolt,
-                              mOD=mOD)
-       
-        if self.save_name is not None and self.save_path is not None:
-            plt.savefig(self.save_path+"/"+self.save_name+"_oscillations.pdf")
 
     def get_oscillations(self, smoothWindowDelayFS, maxDelay=None,
                         delayRange=None, mOD=False, vmin=None, vmax=None, electronvolt=False, figsize=None ):
