@@ -37,6 +37,8 @@ class OscillationAnalysis:
         Absolute value of the fourier transform of the oscillation map.
     phase_map : ndarray
         Phase of the fourier map.
+    svd : ndarray
+        Measure map rebuilt with Singular Value Decomposition.
     """
     def __init__(self, npz_path, save_path=None, save_name=None):
         data = np.load(npz_path)
@@ -48,6 +50,7 @@ class OscillationAnalysis:
         self.oscillations = None
         self.frequency_map = None
         self.phase_map = None
+        self.svd = None
     
     
     def plot_map(self, title=None, 
@@ -129,6 +132,97 @@ class OscillationAnalysis:
                                                int(smoothWindowLambda))
         return measure_map
 
+    def _svd(self, start_component=None, end_component=-1):
+        # function that computes SVD and rebuilt the map from 
+        # start_component to end_component
+        U, s, V = np.linalg.svd(self.measure_map)
+        S = np.zeros((self.measure_map.shape[0], self.measure_map.shape[1]))
+        n_component = len(s)
+        S[:self.measure_map.shape[1], :self.measure_map.shape[1]] = np.diag(s)
+        # not to exit from boundaries
+        if end_component > n_component-1:
+            end_component = -1
+        S = S[:, start_component:end_component]
+        V = V[start_component:end_component, :]
+        self.svd = U.dot(S.dot(V))
+
+    def plot_svd(self, 
+                 component=None, 
+                 until_component=None,
+                 from_component=None,
+                 maxDelay=None,
+                 delayRange=None, 
+                 mOD=False, 
+                 vmin=None, 
+                 vmax=None, 
+                 electronvolt=False, 
+                 figsize=None ):
+        """
+        Plots the singular value decomposizion of the measure map. This function is usefull to check wich 
+        values should be kept in the SVD. Please note that at least one between  `component`, `until_component`
+        and `from_component` should be provided.
+
+        Parameters
+        ----------
+        component : int, optional
+            If provided will plot only this component of the SVD.
+        until_component : int, optional
+            If provided will plot the measure map keeping all components in the SVD until 
+            the value provided. If also `from_component` is provided then it will keep 
+            the values between `from_component` and `until_component`.
+        from_component : int, optional
+            If provided will plot the measure map keeping all components in the SVD from 
+            the value provided. If also `until_component` is provided then it will keep 
+            the values between `from_component` and `until_component`.
+        maxDelay : int, optional
+            If provided plots the measure map only until this delay time. 
+            `delayRange` overrides this argument if provided. 
+        delayRange : tuple, optional
+            Plots the map between the delays (start_time, end_time) if provided.
+        mOD : bool, default: False
+            If True plots in mOD, if False in dT/T (percentage).
+        vmax : float, optional
+            Maximum 2D value to render. It has to be intended as a "cutoff":
+            everything above this value will be threated as `vmax`.
+        vmin : float, optional
+            Same as `vmax`.
+        electronvolt : bool, default: False
+            If True converts the photon wavelength to eV.
+        figsize : (value, value), optional
+            Size of the figure. Refere to matplotlib doc.
+        """
+
+        if component is None and \
+            until_component is None and \
+            from_component is None:
+            raise RuntimeError("At least one between 'component', 'until_component' and 'from_component' must be provided.")
+        elif component is not None:
+            self._svd(component, component+1)
+            title = " Component number " + str(component) + " of the SVD"
+        elif until_component is not None and from_component is None:
+            self._svd(0, until_component+1)
+            title = "SVD from component 0 to " + str(until_component)
+        elif until_component is None and from_component is not None:
+            self._svd(from_component)  
+            title = "SVD from component " + str(from_component) 
+        else:
+            self._svd(from_component, until_component+1)
+            title = "SVD from component " +str(from_component)+ " to " + str(until_component)
+
+        
+
+        plot.plot_measure_map(self.svd, 
+                              self.delays, 
+                              self.lambdas,  
+                              title=title, 
+                              figsize=figsize,  
+                              delayRange=delayRange,
+                              maxDelay=maxDelay,
+                              colorbar=True,
+                              vmin=vmin, vmax=vmax,
+                              electronvolt=electronvolt,
+                              mOD=mOD)
+        
 
     def get_oscillations(self, smoothWindowDelayFS, maxDelay=None,
                         delayRange=None, mOD=False, vmin=None, vmax=None, electronvolt=False, figsize=None ):
@@ -187,6 +281,89 @@ class OscillationAnalysis:
         if self.save_name is not None and self.save_path is not None:
             plt.savefig(self.save_path+"/"+self.save_name+"_oscillations.pdf")
     
+
+    def get_oscillations_svd(self, 
+                             smoothWindowDelayFS=150,
+                             until_component=None,
+                             from_component=None,
+                             maxDelay=None,
+                             delayRange=None, 
+                             mOD=False, 
+                             vmin=None, 
+                             vmax=None, 
+                             electronvolt=False, 
+                             figsize=None ):
+        """
+        Finds fast oscillations. Firstly it rebuilds the measure map using the SVD algorithm, then 
+        it subtracts to the SVD measure map a smoothed one in the delay axis in order to remove the 
+        slowly varying features. 
+        
+        Parameters
+        ----------
+        smoothWindowDelayFS : int, default: 150
+            Moving average window size (used to smooth the map), should be large enough to smooth away
+            the fast oscillations. Numbers between 100 and 250 may be appropriate.
+        until_component : int, optional
+            If provided will compute the measure map keeping all components in the SVD until 
+            the value provided. If also `from_component` is provided then it will keep 
+            the values between `from_component` and `until_component`.
+        from_component : int, optional
+            If provided will compute the measure map keeping all components in the SVD from 
+            the value provided. If also `until_component` is provided then it will keep 
+            the values between `from_component` and `until_component`.
+        maxDelay : int, optional
+            If provided plots the measure map only until this delay time. 
+            `delayRange` overrides this argument if provided. 
+        delayRange : tuple, optional
+            Plots the map between the delays (start_time, end_time) if provided.
+        mOD : bool, default: False
+            If True plots in mOD, if False in dT/T (percentage).
+        vmax : float, optional
+            Maximum 2D value to render. It has to be intended as a "cutoff":
+            everything above this value will be threated as `vmax`.
+        vmin : float, optional
+            Same as `vmax`.
+        electronvolt : bool, default: False
+            If True converts the photon wavelength to eV.
+        figsize : (value, value), optional
+            Size of the figure. Refere to matplotlib doc.
+        """
+        
+        if until_component is None and from_component is None:
+            raise RuntimeError("At least one between 'until_component' and 'from_component' must be provided.")
+        elif until_component is not None and from_component is None:
+            self._svd(0, until_component+1)
+            title = "SVD from component 0 to " + str(until_component)
+        elif until_component is None and from_component is not None:
+            self._svd(from_component)  
+            title = "SVD from component " + str(from_component) 
+        else:
+            self._svd(from_component, until_component+1)
+            title = "SVD from component " +str(from_component)+ " to " + str(until_component)
+        
+        self.oscillations = self.svd - self._smooth(self.svd,
+                                                           self.delays,
+                                                           self.lambdas,
+                                                           smoothWindowDelayFS,
+                                                           0)
+
+        self.oscillations = self._smooth(self.oscillations,
+                                        self.delays,
+                                        self.lambdas,
+                                        0,
+                                        5)
+
+        plot.plot_measure_map(self.oscillations, 
+                              self.delays, 
+                              self.lambdas,  
+                              title="Oscillations with " + title, 
+                              figsize=figsize,  
+                              delayRange=delayRange,
+                              maxDelay=maxDelay,
+                              colorbar=True,
+                              vmin=vmin, vmax=vmax,
+                              electronvolt=electronvolt,
+                              mOD=mOD)
 
     def fourier_transform(self, start_delay, end_delay):
         """
