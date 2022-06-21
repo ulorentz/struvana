@@ -158,9 +158,10 @@ class OscillationAnalysis:
                  electronvolt=False, 
                  figsize=None ):
         """
-        Plots the singular value decomposizion of the measure map. This function is usefull to check wich 
+        Computes and plots the singular value decomposizion of the measure map. This function is usefull to check wich 
         values should be kept in the SVD. Please note that at least one between  `component`, `until_component`
         and `from_component` should be provided.
+        Note that after running this function the class attribute `svd` will be populated.
 
         Parameters
         ----------
@@ -208,8 +209,6 @@ class OscillationAnalysis:
         else:
             self._svd(from_component, until_component+1)
             title = "SVD from component " +str(from_component)+ " to " + str(until_component)
-
-        
 
         plot.plot_measure_map(self.svd, 
                               self.delays, 
@@ -297,7 +296,8 @@ class OscillationAnalysis:
         Finds fast oscillations. Firstly it rebuilds the measure map using the SVD algorithm, then 
         it subtracts to the SVD measure map a smoothed one in the delay axis in order to remove the 
         slowly varying features. 
-        
+        Note that after running this function the class attribute `svd` will be populated.
+
         Parameters
         ----------
         smoothWindowDelayFS : int, default: 150
@@ -422,7 +422,8 @@ class OscillationAnalysis:
         # to set x axis scale to multiple of pi
         ax.xaxis.set_major_formatter(FuncFormatter(
                                         lambda val,pos: '{:.0g}$\pi$'.format(val/np.pi) if val !=0 else '0'
-))
+                                                  )                  
+                                    )
         ax.xaxis.set_major_locator(tck.MultipleLocator(base=np.pi))
         plt.ylabel("Probe wavelength (nm)")
         plt.xlabel("Phase")
