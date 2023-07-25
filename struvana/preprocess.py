@@ -54,11 +54,13 @@ class RawDataManager:
         self.lambdas = None
         self.measure_average = None
         self.measure_stddev = None
+        
 
-        # check if saving path exists
-        if not isdir(save_path):
-            raise NotADirectoryError("'"+save_path + "' doesn't exists")
-        # load data
+        if save_path is not None:
+            # check if saving path exists
+            if not isdir(save_path):
+                raise NotADirectoryError("'"+save_path + "' doesn't exists")
+            # load data
         self._load()
     
     def _load(self):
