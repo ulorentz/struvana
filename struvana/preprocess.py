@@ -33,6 +33,10 @@ class RawDataManager:
         "dir/measure_april".
     save_path : str
         Directory to save the results.
+    comma_decimal : bool, default: False
+        Set `True` if data is formatted with numbers using comma as decimal separator, 
+        for instance "1,231". Use `False` default value) with point as decimal separator,
+        as "1.231".
 
     Attributes
     ----------
@@ -45,7 +49,7 @@ class RawDataManager:
     measure_average : ndarray
         Statistical mean of the scans. After the preprocess this is the data to refer to.
     """
-    def __init__(self, file_path, save_path):
+    def __init__(self, file_path, save_path, comma_decimal=False):
         self.save_path = save_path
         self.file_path = file_path
         self.run_name = self.file_path.split("/")[-1] #assuming last is run name
@@ -54,7 +58,7 @@ class RawDataManager:
         self.lambdas = None
         self.measure_average = None
         self.measure_stddev = None
-        
+        self.comma = comma_decimal 
 
         if save_path is not None:
             # check if saving path exists
@@ -72,11 +76,14 @@ class RawDataManager:
             print("Avoid '_scanNumber' and '.dat'!")
         while exists:
             # load data
-            x = pd.read_csv(self.file_path+"_"+str(n)+".dat",  sep="\t", header=None, index_col=0)
-            self.scans.append(x.to_numpy()[1:]*100) # first row is lambdas
+            if comma_decimal:
+                x = pd.read_table(self.file_path+"_"+str(n)+".dat", decimal=',',header=None)
+            else:
+                x = pd.read_csv(self.file_path+"_"+str(n)+".dat",  sep="\t", header=None, index_col=0)
+            self.scans.append(x.to_numpy()[1:, 1:]*100) # first row is lambdas
             # extract delays and lambdas
             if n == 0:
-                self.delays = x.iloc[0].to_numpy()
+                self.delays = x.iloc[0].to_numpy()[1:]
                 self.lambdas = x.index.to_numpy()[1:]
 
             # increase counter and check again
