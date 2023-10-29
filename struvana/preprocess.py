@@ -54,11 +54,14 @@ class RawDataManager:
         self.file_path = file_path
         self.run_name = self.file_path.split("/")[-1] #assuming last is run name
         self.scans = []
+        self.original_scans = []
         self.delays = None
         self.lambdas = None
+        self.original_delays = None
+        self.original_lambdas = None
         self.measure_average = None
         self.measure_stddev = None
-        self.comma = comma_decimal 
+        self.comma_decimal = comma_decimal 
 
         if save_path is not None:
             # check if saving path exists
@@ -76,7 +79,7 @@ class RawDataManager:
             print("Avoid '_scanNumber' and '.dat'!")
         while exists:
             # load data
-            if comma_decimal:
+            if self.comma_decimal:
                 x = pd.read_table(self.file_path+"_"+str(n)+".dat", decimal=',',header=None)
             else:
                 x = pd.read_csv(self.file_path+"_"+str(n)+".dat",  sep="\t", header=None, index_col=0)
@@ -89,6 +92,19 @@ class RawDataManager:
             # increase counter and check again
             n+=1
             exists = file_exists(self.file_path+"_"+str(n)+".dat")
+
+        # check if data is inverted order of lambda
+        # doing it here is memory-inefficient but ok for now
+        if self.lambdas[-1] < self.lambdas[0]:
+            self.lambdas = np.flip(self.lambdas)
+            for i in range(len(self.scans)):
+                self.scans[i]=np.flip(self.scans[i],0)
+        
+        # populate a new array that will contain the original not modified scans
+        self.original_scans = self.scans.copy()
+        # same for lambdas and delays
+        self.original_lambdas = self.lambdas.copy()
+        self.original_delays = self.delays.copy()
 
     def plot_map(self, title=None, 
                        figsize=None, 
@@ -141,6 +157,16 @@ class RawDataManager:
                               delayRange=delayRange,
                               electronvolt=electronvolt)
     
+
+    def undo_preprocess(self):
+        """
+        Restore the original not modified scans and undo any preprocess function.
+        """
+        self.scans = self.original_scans.copy()
+        self.delays = self.original_delays.copy()
+        self.lambdas = self.original_lambdas.copy()
+        self._average()
+
     def denoise(self, max_delay = 0):
         """
         Removes the average background noise computed on negative delays. 
@@ -166,7 +192,7 @@ class RawDataManager:
         ----------
         lambda_shift : int
             Wavelength to realign. The algorithm will check for shift of the zero
-            for this wavelength in all the scans and if any shift is find will realign
+            for this wavelength in all the scans and if any shift is found will realign
             the scan using this wavelength. Choose a proper one.
         dry_run : bool, default: False
             If true the algorithm will run without modify the data. Can be used to check 
@@ -174,7 +200,7 @@ class RawDataManager:
         Warnings
         --------
         The algorithm modifies the scans and it is irreversible. If not sure about the results 
-        run a dry_run before the actual one. The only way to reverse is to load again the raw scans.
+        run a dry_run before the actual one. 
         """
         # dry_run : doesn't update the scans if true
         min_lambda = min(self.lambdas)
@@ -216,6 +242,7 @@ class RawDataManager:
 
         
             # plot shifted
+        # TODO plot between range
         plt.figure()
         plt.title("After shifting")
         for i in range(nscans):
@@ -240,7 +267,7 @@ class RawDataManager:
         for  i in range(len(self.scans)):
             self.scans[i] = self.scans[i][index1:index2]
         self._average()
-
+ 
     def reject_scans(self, threshold, dry_run = False):
         """"
         Computes the correlations and rejects the ones less correlated than `threshold`.
@@ -258,8 +285,7 @@ class RawDataManager:
         Warnings
         --------
         The algorithm deletes uncorrelated scans and it is irreversible. If not sure 
-        about the results run a dry_run before the actual one. The only way to reverse is to 
-        load again the raw scans.
+        about the results run a dry_run before the actual one. 
         """
         dotMatrix = np.zeros((len(self.scans)-1, len(self.lambdas)))
         for i in range(1,len(self.scans)):

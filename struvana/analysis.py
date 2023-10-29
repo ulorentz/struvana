@@ -390,17 +390,21 @@ class OscillationAnalysis:
         fourier_transform = self.oscillations[:,idx_start:idx_end] @ np.exp(np.outer(self.delays[idx_start:idx_end], - 1j * 2 * np.pi * frequencyFFT))
         # to cm^-1
         frequencyFFT *= 33357
+        max_index = np.argmin(np.abs(frequencyFFT-1000))
+        #frequencyFFT *= 2.99792458*1E-5
+        #frequencyFFT = 1/frequencyFFT
         self.frequency_map = np.abs(fourier_transform)
         self.frequency_map /= np.max(self.frequency_map)
         self.phase_map = np.angle(fourier_transform)
 
-        max_index = np.argmin(np.abs(frequencyFFT-1000))
         plt.figure()
         #we don't have resolution above 1000 cm-1
 
+        #plt.imshow(self.frequency_map, 
         plt.imshow(self.frequency_map[:, :max_index], 
                        aspect="auto", 
                        extent=[frequencyFFT[0], 
+                               #frequencyFFT[-1],
                                frequencyFFT[max_index],
                                self.lambdas[0],
                                self.lambdas[-1]], 
